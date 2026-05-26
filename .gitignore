@@ -1,0 +1,7 @@
+flexdns
+*.exe
+*.test
+*.out
+.idea/
+.vscode/
+vendor/

@@ -36,7 +36,7 @@ func (r *DoTResolver) Resolve(ctx context.Context, domain string, qtype uint16) 
 	if err != nil {
 		return nil, err
 	}
-	return &Result{Answers: ExtractAnswers(resp), Raw: resp}, nil
+	return &Result{Answers: ExtractAnswers(resp, qtype), Raw: resp}, nil
 }
 
 func (r *DoTResolver) Protocol() string { return "dot" }

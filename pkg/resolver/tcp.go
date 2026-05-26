@@ -26,7 +26,7 @@ func (r *TCPResolver) Resolve(ctx context.Context, domain string, qtype uint16) 
 	if err != nil {
 		return nil, err
 	}
-	return &Result{Answers: ExtractAnswers(resp), Raw: resp}, nil
+	return &Result{Answers: ExtractAnswers(resp, qtype), Raw: resp}, nil
 }
 
 func (r *TCPResolver) Protocol() string { return "tcp" }

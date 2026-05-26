@@ -24,9 +24,12 @@ func ParseType(s string) (uint16, bool) {
 	return t, ok
 }
 
-func ExtractAnswers(msg *dns.Msg) []string {
+func ExtractAnswers(msg *dns.Msg, qtype uint16) []string {
 	var answers []string
 	for _, rr := range msg.Answer {
+		if rr.Header().Rrtype != qtype {
+			continue
+		}
 		switch v := rr.(type) {
 		case *dns.A:
 			answers = append(answers, v.A.String())

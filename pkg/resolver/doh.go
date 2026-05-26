@@ -64,7 +64,7 @@ func (r *DoHResolver) Resolve(ctx context.Context, domain string, qtype uint16) 
 		return nil, fmt.Errorf("failed to unpack DNS response: %w", err)
 	}
 
-	return &Result{Answers: ExtractAnswers(dnsResp), Raw: dnsResp}, nil
+	return &Result{Answers: ExtractAnswers(dnsResp, qtype), Raw: dnsResp}, nil
 }
 
 func (r *DoHResolver) Protocol() string { return "doh" }

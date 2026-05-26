@@ -33,7 +33,7 @@ func (r *UDPResolver) Resolve(ctx context.Context, domain string, qtype uint16) 
 			return nil, err
 		}
 	}
-	return &Result{Answers: ExtractAnswers(resp), Raw: resp}, nil
+	return &Result{Answers: ExtractAnswers(resp, qtype), Raw: resp}, nil
 }
 
 func (r *UDPResolver) Protocol() string { return "udp" }

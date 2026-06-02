@@ -24,7 +24,7 @@ type Record struct {
 	Type       string   `json:"type"`
 	Resolver   string   `json:"resolver"`
 	Protocol   string   `json:"protocol"`
-	Answers    []string `json:"answers"`
+	Answers    []string `json:"answers,omitempty"`
 	Rcode      string   `json:"rcode,omitempty"`
 	CDN        *CDNInfo `json:"cdn,omitempty"`
 	ASN        *ASNInfo `json:"asn,omitempty"`
@@ -41,22 +41,32 @@ type CompactRecord struct {
 	ASN     string   `json:"asn,omitempty"`
 }
 
+type WriterOptions struct {
+	JSONMode    bool
+	CompactJSON bool
+	Silent      bool
+	OutputPath  string
+	ShowAnswer  bool
+}
+
 type Writer struct {
 	jsonMode    bool
 	compactJSON bool
 	silent      bool
+	showAnswer  bool
 	file        *os.File
 	mu          sync.Mutex
 }
 
-func NewWriter(jsonMode bool, compactJSON bool, silent bool, outputPath string) (*Writer, error) {
+func NewWriter(wopts WriterOptions) (*Writer, error) {
 	w := &Writer{
-		jsonMode:    jsonMode,
-		compactJSON: compactJSON,
-		silent:      silent,
+		jsonMode:    wopts.JSONMode,
+		compactJSON: wopts.CompactJSON,
+		silent:      wopts.Silent,
+		showAnswer:  wopts.ShowAnswer,
 	}
-	if outputPath != "" {
-		f, err := os.Create(outputPath)
+	if wopts.OutputPath != "" {
+		f, err := os.Create(wopts.OutputPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create output file: %w", err)
 		}
@@ -67,6 +77,10 @@ func NewWriter(jsonMode bool, compactJSON bool, silent bool, outputPath string) 
 
 func (w *Writer) Write(record *Record) {
 	record.Timestamp = time.Now().UTC().Format(time.RFC3339)
+
+	if !w.showAnswer {
+		record.Answers = nil
+	}
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -92,13 +106,25 @@ func (w *Writer) Write(record *Record) {
 			line = string(data)
 		}
 	} else {
-		line = fmt.Sprintf("%s [%s] [%s]", record.Domain, record.Type, strings.Join(record.Answers, ", "))
+		var parts []string
+		parts = append(parts, record.Domain)
+		parts = append(parts, fmt.Sprintf("[%s]", record.Type))
+		if len(record.Answers) > 0 {
+			parts = append(parts, fmt.Sprintf("[%s]", strings.Join(record.Answers, ", ")))
+		}
 		if record.CDN != nil {
-			line += fmt.Sprintf(" [CDN: %s]", record.CDN.Provider)
+			parts = append(parts, fmt.Sprintf("[CDN: %s]", record.CDN.Provider))
 		}
 		if record.ASN != nil {
-			line += fmt.Sprintf(" [%s %s]", record.ASN.ASN, record.ASN.Desc)
+			parts = append(parts, fmt.Sprintf("[%s %s]", record.ASN.ASN, record.ASN.Desc))
 		}
+		if len(record.Authority) > 0 {
+			parts = append(parts, fmt.Sprintf("[Authority: %s]", strings.Join(record.Authority, "; ")))
+		}
+		if len(record.Additional) > 0 {
+			parts = append(parts, fmt.Sprintf("[Additional: %s]", strings.Join(record.Additional, "; ")))
+		}
+		line = strings.Join(parts, " ")
 	}
 
 	fmt.Fprintln(os.Stdout, line)

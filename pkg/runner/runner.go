@@ -41,7 +41,13 @@ func New(opts *Options) (*Runner, error) {
 		resolvers = append(resolvers, r)
 	}
 
-	writer, err := output.NewWriter(opts.JSONOutput, opts.JSONCompact, opts.Silent, opts.OutputFile)
+	writer, err := output.NewWriter(output.WriterOptions{
+		JSONMode:    opts.JSONOutput,
+		CompactJSON: opts.JSONCompact,
+		Silent:      opts.Silent,
+		OutputPath:  opts.OutputFile,
+		ShowAnswer:  opts.ShowAnswer,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create output writer: %w", err)
 	}

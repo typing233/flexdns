@@ -17,41 +17,85 @@ var TypeMap = map[string]uint16{
 	"PTR":   dns.TypePTR,
 	"SOA":   dns.TypeSOA,
 	"SRV":   dns.TypeSRV,
+	"CAA":   dns.TypeCAA,
+	"ANY":   dns.TypeANY,
 }
+
+var AllTypes = []string{"A", "AAAA", "CNAME", "NS", "MX", "TXT", "PTR", "SOA", "SRV", "CAA"}
 
 func ParseType(s string) (uint16, bool) {
 	t, ok := TypeMap[strings.ToUpper(s)]
 	return t, ok
 }
 
+func ExpandRecordTypes(types []string, excludes []string) []string {
+	excludeSet := make(map[string]struct{})
+	for _, e := range excludes {
+		excludeSet[strings.ToUpper(strings.TrimSpace(e))] = struct{}{}
+	}
+
+	var result []string
+	for _, t := range types {
+		t = strings.ToUpper(strings.TrimSpace(t))
+		if t == "ALL" {
+			for _, at := range AllTypes {
+				if _, excluded := excludeSet[at]; !excluded {
+					result = append(result, at)
+				}
+			}
+		} else {
+			if _, excluded := excludeSet[t]; !excluded {
+				result = append(result, t)
+			}
+		}
+	}
+	return result
+}
+
 func ExtractAnswers(msg *dns.Msg, qtype uint16) []string {
 	var answers []string
 	for _, rr := range msg.Answer {
-		if rr.Header().Rrtype != qtype {
+		if qtype != dns.TypeANY && rr.Header().Rrtype != qtype {
 			continue
 		}
-		switch v := rr.(type) {
-		case *dns.A:
-			answers = append(answers, v.A.String())
-		case *dns.AAAA:
-			answers = append(answers, v.AAAA.String())
-		case *dns.CNAME:
-			answers = append(answers, v.Target)
-		case *dns.NS:
-			answers = append(answers, v.Ns)
-		case *dns.MX:
-			answers = append(answers, fmt.Sprintf("%d %s", v.Preference, v.Mx))
-		case *dns.TXT:
-			answers = append(answers, strings.Join(v.Txt, " "))
-		case *dns.PTR:
-			answers = append(answers, v.Ptr)
-		case *dns.SOA:
-			answers = append(answers, fmt.Sprintf("%s %s %d %d %d %d %d",
-				v.Ns, v.Mbox, v.Serial, v.Refresh, v.Retry, v.Expire, v.Minttl))
-		case *dns.SRV:
-			answers = append(answers, fmt.Sprintf("%d %d %d %s",
-				v.Priority, v.Weight, v.Port, v.Target))
-		}
+		answers = append(answers, extractRR(rr)...)
 	}
 	return answers
+}
+
+func ExtractAllAnswers(msg *dns.Msg) []string {
+	var answers []string
+	for _, rr := range msg.Answer {
+		answers = append(answers, extractRR(rr)...)
+	}
+	return answers
+}
+
+func extractRR(rr dns.RR) []string {
+	switch v := rr.(type) {
+	case *dns.A:
+		return []string{v.A.String()}
+	case *dns.AAAA:
+		return []string{v.AAAA.String()}
+	case *dns.CNAME:
+		return []string{v.Target}
+	case *dns.NS:
+		return []string{v.Ns}
+	case *dns.MX:
+		return []string{fmt.Sprintf("%d %s", v.Preference, v.Mx)}
+	case *dns.TXT:
+		return []string{strings.Join(v.Txt, " ")}
+	case *dns.PTR:
+		return []string{v.Ptr}
+	case *dns.SOA:
+		return []string{fmt.Sprintf("%s %s %d %d %d %d %d",
+			v.Ns, v.Mbox, v.Serial, v.Refresh, v.Retry, v.Expire, v.Minttl)}
+	case *dns.SRV:
+		return []string{fmt.Sprintf("%d %d %d %s",
+			v.Priority, v.Weight, v.Port, v.Target)}
+	case *dns.CAA:
+		return []string{fmt.Sprintf("%d %s %s", v.Flag, v.Tag, v.Value)}
+	default:
+		return []string{rr.String()}
+	}
 }

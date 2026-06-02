@@ -9,26 +9,51 @@ import (
 	"time"
 )
 
+type CDNInfo struct {
+	Provider string `json:"provider"`
+	Matched  string `json:"matched,omitempty"`
+}
+
+type ASNInfo struct {
+	ASN  string `json:"asn"`
+	Desc string `json:"desc,omitempty"`
+}
+
 type Record struct {
-	Domain    string   `json:"domain"`
-	Type      string   `json:"type"`
-	Resolver  string   `json:"resolver"`
-	Protocol  string   `json:"protocol"`
-	Answers   []string `json:"answers"`
-	Timestamp string   `json:"timestamp"`
+	Domain     string   `json:"domain"`
+	Type       string   `json:"type"`
+	Resolver   string   `json:"resolver"`
+	Protocol   string   `json:"protocol"`
+	Answers    []string `json:"answers"`
+	Rcode      string   `json:"rcode,omitempty"`
+	CDN        *CDNInfo `json:"cdn,omitempty"`
+	ASN        *ASNInfo `json:"asn,omitempty"`
+	Authority  []string `json:"authority,omitempty"`
+	Additional []string `json:"additional,omitempty"`
+	Timestamp  string   `json:"timestamp"`
+}
+
+type CompactRecord struct {
+	Domain  string   `json:"d"`
+	Type    string   `json:"t"`
+	Answers []string `json:"a"`
+	CDN     string   `json:"cdn,omitempty"`
+	ASN     string   `json:"asn,omitempty"`
 }
 
 type Writer struct {
-	jsonMode bool
-	silent   bool
-	file     *os.File
-	mu       sync.Mutex
+	jsonMode    bool
+	compactJSON bool
+	silent      bool
+	file        *os.File
+	mu          sync.Mutex
 }
 
-func NewWriter(jsonMode bool, silent bool, outputPath string) (*Writer, error) {
+func NewWriter(jsonMode bool, compactJSON bool, silent bool, outputPath string) (*Writer, error) {
 	w := &Writer{
-		jsonMode: jsonMode,
-		silent:   silent,
+		jsonMode:    jsonMode,
+		compactJSON: compactJSON,
+		silent:      silent,
 	}
 	if outputPath != "" {
 		f, err := os.Create(outputPath)
@@ -48,12 +73,43 @@ func (w *Writer) Write(record *Record) {
 
 	var line string
 	if w.jsonMode {
-		data, _ := json.Marshal(record)
-		line = string(data)
+		if w.compactJSON {
+			compact := CompactRecord{
+				Domain:  record.Domain,
+				Type:    record.Type,
+				Answers: record.Answers,
+			}
+			if record.CDN != nil {
+				compact.CDN = record.CDN.Provider
+			}
+			if record.ASN != nil {
+				compact.ASN = record.ASN.ASN
+			}
+			data, _ := json.Marshal(compact)
+			line = string(data)
+		} else {
+			data, _ := json.Marshal(record)
+			line = string(data)
+		}
 	} else {
 		line = fmt.Sprintf("%s [%s] [%s]", record.Domain, record.Type, strings.Join(record.Answers, ", "))
+		if record.CDN != nil {
+			line += fmt.Sprintf(" [CDN: %s]", record.CDN.Provider)
+		}
+		if record.ASN != nil {
+			line += fmt.Sprintf(" [%s %s]", record.ASN.ASN, record.ASN.Desc)
+		}
 	}
 
+	fmt.Fprintln(os.Stdout, line)
+	if w.file != nil {
+		fmt.Fprintln(w.file, line)
+	}
+}
+
+func (w *Writer) WriteRaw(line string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	fmt.Fprintln(os.Stdout, line)
 	if w.file != nil {
 		fmt.Fprintln(w.file, line)

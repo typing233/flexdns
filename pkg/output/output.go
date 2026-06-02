@@ -34,11 +34,13 @@ type Record struct {
 }
 
 type CompactRecord struct {
-	Domain  string   `json:"d"`
-	Type    string   `json:"t"`
-	Answers []string `json:"a"`
-	CDN     string   `json:"cdn,omitempty"`
-	ASN     string   `json:"asn,omitempty"`
+	Domain     string   `json:"d"`
+	Type       string   `json:"t"`
+	Answers    []string `json:"a,omitempty"`
+	CDN        string   `json:"cdn,omitempty"`
+	ASN        string   `json:"asn,omitempty"`
+	Authority  []string `json:"ns,omitempty"`
+	Additional []string `json:"ex,omitempty"`
 }
 
 type WriterOptions struct {
@@ -89,9 +91,11 @@ func (w *Writer) Write(record *Record) {
 	if w.jsonMode {
 		if w.compactJSON {
 			compact := CompactRecord{
-				Domain:  record.Domain,
-				Type:    record.Type,
-				Answers: record.Answers,
+				Domain:     record.Domain,
+				Type:       record.Type,
+				Answers:    record.Answers,
+				Authority:  record.Authority,
+				Additional: record.Additional,
 			}
 			if record.CDN != nil {
 				compact.CDN = record.CDN.Provider
